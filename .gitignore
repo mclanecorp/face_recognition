@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+
+# Registered face data (contains personal biometric data)
+data/faces/*.pkl
+data/faces/*.jpg
+data/faces/*.png
+data/detections/*.jpg
+data/detections/*.png
+
+# Keep directory structure
+!data/faces/.gitkeep
+#!data/detections/.gitkeep
+!logs/.gitkeep
+#!logs/temp_notifications/.gitkeep
+#!config/.gitkeep
+
+# Logs
+logs/*.log
+logs/*.txt
+logs/*.csv
+logs/temp_notifications/*.jpg
+logs/temp_notifications/*.png
+
+# Test/temp files
+test_capture.jpg
+*.jpg
+*.png
+*.jpeg
+!README*.png
+!docs/*.png
+!src/web/static/**/*.png
+!src/web/static/**/*.jpg
+
+# Jupyter Notebooks (if added later)
+.ipynb_checkpoints/
+*.ipynb
+
+# Config files with secrets
+config/*.json
+config/*.yaml
+config/*.yml
+!config/*.example.json
+!config/*.example.yaml
+!config/*.example.yml
+
+# Temporary notification files
+logs/temp_notifications/
