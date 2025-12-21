@@ -1,0 +1,31 @@
+{
+    "camera": {
+        "device_id": 0,
+        "width": 640,
+        "height": 480
+    },
+    "recognition": {
+        "tolerance": 0.6,
+        "process_every_n_frames": 2,
+        "model": "hog"
+    },
+    "display": {
+        "show_confidence": true,
+        "show_timestamp": true,
+        "show_fps": true,
+        "debug_mode": false
+    },
+    "colors": {
+        "known": [0, 255, 0],
+        "unknown": [0, 0, 255],
+        "text": [255, 255, 255]
+    },
+    "notifications": {
+        "discord": {
+            "enabled": true,
+            "webhook_url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
+            "send_image": true,
+            "cooldown": 30
+        }
+    }
+}

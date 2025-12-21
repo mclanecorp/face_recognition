@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reconnaissance Faciale - Interface Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎭 Système de Reconnaissance Faciale</h1>
+            <div class="status-bar">
+                <span id="status-indicator" class="status-dot inactive"></span>
+                <span id="status-text">Reconnaissance désactivée</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="video-container">
+                <img src="{{ url_for('video_feed') }}" alt="Flux vidéo" class="video-stream">
+            </div>
+
+            <div class="controls">
+                <button id="toggle-recognition" class="btn btn-primary">
+                    Activer la reconnaissance
+                </button>
+                <button id="reload-faces" class="btn btn-secondary">
+                    Recharger les visages
+                </button>
+                 <a href="/register" class="btn" style="background: #8b5cf6; color: white; text-decoration: none;">
+                    ➕ Enregistrer un nouveau visage
+                </a>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-card">
+                    <h3>Dernière reconnaissance</h3>
+                    <div id="last-recognition">
+                        <p class="name">Aucune</p>
+                        <p class="confidence"></p>
+                        <p class="timestamp"></p>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3>Statistiques</h3>
+                    <div id="stats">
+                        <p>Visages enregistrés: <span id="known-faces">0</span></p>
+                        <p>Reconnaissance: <span id="recognition-status">Inactive</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="logs-container">
+                <h3>Historique des reconnaissances</h3>
+                <div id="logs" class="logs-content">
+                    <p>Aucun log disponible</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Projet de reconnaissance faciale - EPIC 10</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
