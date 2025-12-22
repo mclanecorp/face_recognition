@@ -2,11 +2,12 @@ let currentStep = 1;
 let captureCount = 0;
 const totalCaptures = 5;
 let registrationActive = false;
+let autoCapturing = false;
 
 // Éléments DOM
 const nameInput = document.getElementById('name-input');
 const startBtn = document.getElementById('start-btn');
-const captureBtn = document.getElementById('capture-btn');
+const autoCaptureBtn = document.getElementById('auto-capture-btn');
 const cancelBtn = document.getElementById('cancel-btn');
 const saveBtn = document.getElementById('save-btn');
 const newRegBtn = document.getElementById('new-registration-btn');
@@ -51,46 +52,67 @@ startBtn.addEventListener('click', async () => {
     }
 });
 
-// Capturer une photo
-captureBtn.addEventListener('click', capturePhoto);
-
-// Raccourci clavier (Espace)
-document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && currentStep === 2 && captureCount < totalCaptures) {
-        e.preventDefault();
-        capturePhoto();
+// Capture automatique
+autoCaptureBtn.addEventListener('click', () => {
+    if (!autoCapturing) {
+        autoCapturing = true;
+        autoCaptureBtn.textContent = '⏸️ PAUSE';
+        autoCaptureBtn.style.background = '#ef4444';
+        startAutoCapture();
+    } else {
+        autoCapturing = false;
+        autoCaptureBtn.textContent = '🤖 REPRENDRE CAPTURE AUTO';
+        autoCaptureBtn.style.background = '#667eea';
     }
 });
 
-async function capturePhoto() {
-    if (captureCount >= totalCaptures) return;
+// Fonction de capture automatique
+async function startAutoCapture() {
+    showNotification('Capture automatique démarrée. Restez face à la caméra !', 'info');
     
-    try {
-        const response = await fetch('/api/auto_capture', {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            captureCount = data.count;
-            updateProgress();
+    while (autoCapturing && captureCount < totalCaptures) {
+        try {
+            const response = await fetch('/api/auto_capture', {
+                method: 'POST'
+            });
             
-            // Marquer le slot comme capturé
-            document.getElementById(`slot-${captureCount}`).classList.add('captured');
-            document.getElementById(`slot-${captureCount}`).textContent = '✓';
+            const data = await response.json();
             
-            showNotification(`Photo ${captureCount}/${totalCaptures} capturée !`, 'success');
-            
-            if (data.complete) {
-                setTimeout(() => goToStep(3), 500);
+            if (data.success) {
+                captureCount = data.count;
+                updateProgress();
+                
+                // Marquer le slot comme capturé
+                document.getElementById(`slot-${captureCount}`).classList.add('captured');
+                document.getElementById(`slot-${captureCount}`).textContent = '✓';
+                
+                showNotification(`✅ Photo ${captureCount}/${totalCaptures} capturée !`, 'success');
+                
+                if (data.complete) {
+                    autoCapturing = false;
+                    autoCaptureBtn.textContent = '✅ TERMINÉ';
+                    autoCaptureBtn.disabled = true;
+                    setTimeout(() => goToStep(3), 1000);
+                    break;
+                }
+                
+                // Attendre 2 secondes entre chaque capture
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+                // Si erreur (pas de visage ou plusieurs visages), réessayer après 1 seconde
+                console.log('Attente d\'un visage valide...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-        } else {
-            showNotification(data.message, 'error');
+        } catch (error) {
+            console.error('Erreur:', error);
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
-    } catch (error) {
-        showNotification('Erreur lors de la capture', 'error');
-        console.error(error);
+    }
+    
+    // Si on a arrêté manuellement avant la fin
+    if (!autoCapturing && captureCount < totalCaptures) {
+        autoCaptureBtn.textContent = '🤖 REPRENDRE CAPTURE AUTO';
+        autoCaptureBtn.style.background = '#667eea';
     }
 }
 
@@ -99,6 +121,7 @@ cancelBtn.addEventListener('click', async () => {
     if (!confirm('Voulez-vous vraiment annuler l\'enregistrement ?')) return;
     
     try {
+        autoCapturing = false;
         await fetch('/api/cancel_registration', {method: 'POST'});
         registrationActive = false;
         resetRegistration();
@@ -176,7 +199,13 @@ function updateProgress() {
 function resetRegistration() {
     captureCount = 0;
     registrationActive = false;
+    autoCapturing = false;
     updateProgress();
+    
+    // Réinitialiser le bouton
+    autoCaptureBtn.textContent = '🤖 CAPTURE AUTOMATIQUE';
+    autoCaptureBtn.style.background = '#667eea';
+    autoCaptureBtn.disabled = false;
     
     // Réinitialiser les slots
     for (let i = 1; i <= totalCaptures; i++) {
