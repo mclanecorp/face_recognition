@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Interface Web Flask pour la reconnaissance faciale
-EPIC 10 - Interface web avec notifications Discord
+EPIC 10 - Interface web avec notifications Discord, downscale intelligent et FPS
 """
 from flask import Flask, render_template, Response, jsonify, request
 import cv2
@@ -18,6 +18,28 @@ import sys
 # Importer le module de notifications
 sys.path.append('../..')
 from src.notifications import NotificationManager
+
+
+class FPSCounter:
+    """Compteur de FPS"""
+    
+    def __init__(self):
+        self.fps = 0
+        self.frame_count = 0
+        self.start_time = datetime.now()
+    
+    def update(self):
+        """Met à jour le compteur FPS"""
+        self.frame_count += 1
+        elapsed = (datetime.now() - self.start_time).total_seconds()
+        
+        if elapsed > 1.0:
+            self.fps = self.frame_count / elapsed
+            self.frame_count = 0
+            self.start_time = datetime.now()
+        
+        return self.fps
+
 
 app = Flask(__name__)
 
@@ -116,6 +138,36 @@ def get_camera():
     return camera
 
 
+def detect_faces_optimized(frame):
+    """
+    Détection optimisée avec downscaling intelligent
+    - Détecte sur une image réduite (2x plus rapide)
+    - Encode sur l'image originale (précision maximale)
+    """
+    # Réduire la taille pour la détection (gain de performance ~60%)
+    small_frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+    rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+    
+    # Détecter sur la petite image
+    face_locations_small = face_recognition.face_locations(rgb_small, model="hog")
+    
+    # Si aucun visage détecté, retourner vide
+    if not face_locations_small:
+        return [], []
+    
+    # Scale up les coordonnées pour l'image originale (x2)
+    face_locations = [
+        (top * 2, right * 2, bottom * 2, left * 2)
+        for (top, right, bottom, left) in face_locations_small
+    ]
+    
+    # Encoder sur l'image ORIGINALE pour garder la précision
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+    
+    return face_locations, face_encodings
+
+
 def generate_frames():
     """Génère les frames pour le streaming vidéo"""
     global recognition_active, last_recognition
@@ -127,6 +179,9 @@ def generate_frames():
     last_face_locations = []
     last_face_data = []
     
+    # Compteur FPS
+    fps_counter = FPSCounter()
+    
     while True:
         camera = get_camera()
         
@@ -137,16 +192,17 @@ def generate_frames():
         
         frame_count += 1
         
+        # Mettre à jour FPS
+        current_fps = fps_counter.update()
+        
         # Liste des personnes détectées dans cette frame
         detected_people = []
         
         # Reconnaissance uniquement si activée
         if recognition_active and frame_count % process_every_n_frames == 0:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
             try:
-                face_locations = face_recognition.face_locations(rgb_frame)
-                face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+                # UTILISER LA DÉTECTION OPTIMISÉE
+                face_locations, face_encodings = detect_faces_optimized(frame)
                 
                 # Réinitialiser les données
                 face_data = []
@@ -213,16 +269,25 @@ def generate_frames():
             cv2.putText(frame, label, (left + 6, bottom - 6),
                        cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
         
-        # Ajouter timestamp
+        # Overlay d'informations
+        info_y = 30
+        
+        # Timestamp
         timestamp = datetime.now().strftime("%H:%M:%S")
-        cv2.putText(frame, timestamp, (10, 30),
+        cv2.putText(frame, timestamp, (10, info_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        info_y += 30
         
         # Nombre de visages
-        cv2.putText(frame, f"Visages: {len(last_face_locations)}", (10, 60),
+        cv2.putText(frame, f"Visages: {len(last_face_locations)}", (10, info_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        info_y += 30
+        
+        # FPS
+        cv2.putText(frame, f"FPS: {current_fps:.1f}", (10, info_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
-        # Indicateur de reconnaissance active
+        # Indicateur de reconnaissance active (coin supérieur droit)
         if recognition_active:
             cv2.circle(frame, (frame.shape[1] - 30, 30), 10, (0, 255, 0), -1)
         
@@ -232,6 +297,7 @@ def generate_frames():
         
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
 
 @app.route('/')
 def index():
@@ -434,6 +500,9 @@ def generate_frames_registration():
     """Génère les frames pour l'enregistrement"""
     global registration_count, registration_encodings
     
+    # Compteur FPS
+    fps_counter = FPSCounter()
+    
     while True:
         camera = get_camera()
         
@@ -441,17 +510,19 @@ def generate_frames_registration():
         if not success:
             break
         
+        # Mettre à jour FPS
+        current_fps = fps_counter.update()
+        
         if registration_mode:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
             try:
-                face_locations = face_recognition.face_locations(rgb_frame)
+                # UTILISER LA DÉTECTION OPTIMISÉE
+                face_locations, _ = detect_faces_optimized(frame)
                 
                 if len(face_locations) == 1:
                     # Un seul visage - OK
                     top, right, bottom, left = face_locations[0]
                     cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-                    cv2.putText(frame, "Visage OK - Cliquez CAPTURER", (left, top - 10),
+                    cv2.putText(frame, "Visage OK - Capture auto en cours", (left, top - 10),
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 
                 elif len(face_locations) == 0:
@@ -466,9 +537,17 @@ def generate_frames_registration():
             except Exception as e:
                 logger.error(f"Erreur détection: {e}")
         
+        # Overlay d'informations
+        info_y = 60
+        
         # Compteur
-        cv2.putText(frame, f"Photos: {registration_count}/{registration_total}", (10, 60),
+        cv2.putText(frame, f"Photos: {registration_count}/{registration_total}", (10, info_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        info_y += 30
+        
+        # FPS
+        cv2.putText(frame, f"FPS: {current_fps:.1f}", (10, info_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
         # Encoder
         ret, buffer = cv2.imencode('.jpg', frame)
@@ -495,8 +574,8 @@ def auto_capture():
     if not success:
         return jsonify({"success": False, "message": "Erreur lecture caméra"}), 500
     
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    face_locations = face_recognition.face_locations(rgb_frame)
+    # UTILISER LA DÉTECTION OPTIMISÉE
+    face_locations, face_encodings = detect_faces_optimized(frame)
     
     if len(face_locations) != 1:
         return jsonify({
@@ -504,9 +583,8 @@ def auto_capture():
             "message": "Un seul visage requis"
         }), 400
     
-    # Encoder le visage
-    face_encoding = face_recognition.face_encodings(rgb_frame, face_locations)[0]
-    registration_encodings.append(face_encoding)
+    # Utiliser l'encodage déjà calculé
+    registration_encodings.append(face_encodings[0])
     registration_count += 1
     
     logger.info(f"✅ Photo {registration_count}/{registration_total} capturée")
