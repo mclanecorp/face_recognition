@@ -178,6 +178,7 @@ def generate_frames():
     # Variables pour mémoriser les derniers résultats
     last_face_locations = []
     last_face_data = []
+    detected_people = []  # Déplacer ici pour garder entre frames
     
     # Compteur FPS
     fps_counter = FPSCounter()
@@ -195,64 +196,60 @@ def generate_frames():
         # Mettre à jour FPS
         current_fps = fps_counter.update()
         
-        # Liste des personnes détectées dans cette frame
-        detected_people = []
-        
         # Reconnaissance uniquement si activée
-        if recognition_active and frame_count % process_every_n_frames == 0:
-            try:
-                # UTILISER LA DÉTECTION OPTIMISÉE
-                face_locations, face_encodings = detect_faces_optimized(frame)
+        if recognition_active:
+            # Traiter la détection toutes les N frames
+            if frame_count % process_every_n_frames == 0:
+                detected_people = []  # Réinitialiser la liste
                 
-                # Réinitialiser les données
-                face_data = []
-                
-                for face_encoding in face_encodings:
-                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.6)
-                    name = "Inconnu"
-                    confidence = 0.0
+                try:
+                    # UTILISER LA DÉTECTION OPTIMISÉE
+                    face_locations, face_encodings = detect_faces_optimized(frame)
                     
-                    if True in matches:
-                        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-                        best_match_index = face_distances.argmin()
+                    # Réinitialiser les données
+                    face_data = []
+                    
+                    for face_encoding in face_encodings:
+                        matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.6)
+                        name = "Inconnu"
+                        confidence = 0.0
                         
-                        if matches[best_match_index]:
-                            name = known_face_names[best_match_index]
-                            confidence = 1 - face_distances[best_match_index]
+                        if True in matches:
+                            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
+                            best_match_index = face_distances.argmin()
                             
-                            # Mettre à jour la dernière reconnaissance
-                            last_recognition = {
-                                "name": name,
-                                "confidence": float(confidence),
-                                "timestamp": datetime.now().isoformat()
-                            }
-                            
-                            logger.info(f"✅ Reconnu: {name} ({confidence:.2%})")
-                            
-                            # Ajouter à la liste des personnes détectées
-                            detected_people.append((name, confidence, frame.copy()))
+                            if matches[best_match_index]:
+                                name = known_face_names[best_match_index]
+                                confidence = 1 - face_distances[best_match_index]
+                                
+                                # Mettre à jour la dernière reconnaissance
+                                last_recognition = {
+                                    "name": name,
+                                    "confidence": float(confidence),
+                                    "timestamp": datetime.now().isoformat()
+                                }
+                                
+                                logger.info(f"✅ Reconnu: {name} ({confidence:.2%})")
+                                
+                                # Ajouter à la liste des personnes détectées
+                                detected_people.append((name, confidence, frame.copy()))
+                        
+                        face_data.append({
+                            'name': name,
+                            'confidence': confidence
+                        })
                     
-                    face_data.append({
-                        'name': name,
-                        'confidence': confidence
-                    })
+                    # Mémoriser les résultats
+                    last_face_locations = face_locations
+                    last_face_data = face_data
                 
-                # Mémoriser les résultats
-                last_face_locations = face_locations
-                last_face_data = face_data
-                
-                # Traiter les événements de présence (arrivée/départ)
-                if notification_manager:
-                    events = notification_manager.update_presence(detected_people)
-                    notification_manager.process_events(events)
+                except Exception as e:
+                    logger.error(f"❌ Erreur reconnaissance: {e}")
             
-            except Exception as e:
-                logger.error(f"❌ Erreur reconnaissance: {e}")
-        
-        # Si reconnaissance inactive, mettre à jour avec liste vide (pour détecter les départs)
-        elif recognition_active and notification_manager:
-            events = notification_manager.update_presence([])
-            notification_manager.process_events(events)
+            # Traiter les événements de présence à CHAQUE frame
+            if notification_manager:
+                events = notification_manager.update_presence(detected_people)
+                notification_manager.process_events(events)
         
         # Dessiner avec les derniers résultats mémorisés
         for (top, right, bottom, left), data in zip(last_face_locations, last_face_data):
@@ -297,7 +294,6 @@ def generate_frames():
         
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
 
 @app.route('/')
 def index():
@@ -595,7 +591,7 @@ def auto_capture():
         "total": registration_total,
         "complete": registration_count >= registration_total
     })
-    
+
 @app.route('/api/test_homeassistant', methods=['POST'])
 def test_homeassistant():
     """Teste la connexion Home Assistant"""
