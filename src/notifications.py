@@ -12,6 +12,9 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+import sys
+sys.path.append('.')
+from src.home_assistant_integration import HomeAssistantIntegration
 
 class NotificationManager:
     """Gestionnaire de notifications avec détection présence"""
@@ -25,6 +28,10 @@ class NotificationManager:
         # Configuration
         self.absence_threshold = 10  # Secondes sans détection = parti
         self.min_presence_duration = 3  # Secondes minimum de présence avant notification départ
+
+        # Intégration Home Assistant
+        self.ha_integration = HomeAssistantIntegration(config)
+        
     
     def update_presence(self, detected_people):
         """
@@ -115,11 +122,19 @@ class NotificationManager:
         """Notification d'arrivée"""
         if self.config.get("notifications", "discord", "enabled"):
             self._send_discord_arrival(name, data)
+
+        # Déclencher actions Home Assistant
+        if self.ha_integration:
+            self.ha_integration.trigger_on_arrival(name)
     
     def _notify_departure(self, name, data):
         """Notification de départ"""
         if self.config.get("notifications", "discord", "enabled"):
             self._send_discord_departure(name, data)
+
+        # Déclencher actions Home Assistant
+        if self.ha_integration:
+            self.ha_integration.trigger_on_departure(name)
     
     def _send_discord_arrival(self, name, data):
         """Envoie une notification Discord d'arrivée"""

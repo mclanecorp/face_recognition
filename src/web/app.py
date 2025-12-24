@@ -595,7 +595,17 @@ def auto_capture():
         "total": registration_total,
         "complete": registration_count >= registration_total
     })
-
+    
+@app.route('/api/test_homeassistant', methods=['POST'])
+def test_homeassistant():
+    """Teste la connexion Home Assistant"""
+    if notification_manager and notification_manager.ha_integration:
+        success = notification_manager.ha_integration.test_connection()
+        return jsonify({
+            "success": success,
+            "message": "Connexion OK" if success else "Connexion échouée"
+        })
+    return jsonify({"success": False, "message": "Home Assistant non configuré"})
 
 if __name__ == '__main__':
     logger.info("=" * 50)

@@ -27,5 +27,35 @@
             "send_image": true,
             "cooldown": 30
         }
+    },
+     "home_assistant": {
+        "enabled": true,
+        "url": "http://IP:8123",
+        "token": "TOKEN",
+        "actions": {
+            "on_arrival": [
+                {
+                    "entity_id": "light.plafond",
+                    "service": "light.turn_on",
+                    "data": {
+                        "brightness": 255
+                    }
+                },
+                {
+                    "entity_id": "tts.google_translate_fr_com",
+                    "service": "tts.speak",
+                    "data": {
+                        "message": "Bienvenue dans ma chambre !",
+                        "media_player_entity_id": "media_player.google_home"
+                    }
+                }
+            ],
+            "on_departure": [
+                {
+                    "entity_id": "light.plafond",
+                    "service": "light.turn_off"
+                }
+            ]
+        }
     }
 }

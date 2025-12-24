@@ -10,6 +10,7 @@ const lastRecognitionDiv = document.getElementById('last-recognition');
 const knownFacesSpan = document.getElementById('known-faces');
 const recognitionStatusSpan = document.getElementById('recognition-status');
 const logsDiv = document.getElementById('logs');
+const testHaBtn = document.getElementById('test-ha-btn');
 
 // Toggle reconnaissance
 toggleBtn.addEventListener('click', async () => {
@@ -148,6 +149,19 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// homeAssistant
+testHaBtn.addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/test_homeassistant', {
+            method: 'POST'
+        });
+        const data = await response.json();
+        showNotification(data.message, data.success ? 'success' : 'error');
+    } catch (error) {
+        showNotification('Erreur de test', 'error');
+    }
+});
 
 // Mise à jour automatique toutes les 2 secondes
 setInterval(updateStatus, 2000);
